@@ -77,7 +77,11 @@
             "openrouter.o4-mini",
             "openrouter.claude-3.5-haiku",
             "claude-4-opus",
-            "openrouter.o1-pro"
+            "openrouter.o1-pro",
+            "openrouter.llama-4-scout",
+            "openrouter.llama-4-maverick",
+            "openrouter.llama-4-scout-free",
+            "openrouter.llama-4-maverick-free"
           ],
           "type": "string"
         },
@@ -176,7 +180,11 @@
               "openrouter.o4-mini",
               "openrouter.claude-3.5-haiku",
               "claude-4-opus",
-              "openrouter.o1-pro"
+              "openrouter.o1-pro",
+              "openrouter.llama-4-scout",
+              "openrouter.llama-4-maverick",
+              "openrouter.llama-4-scout-free",
+              "openrouter.llama-4-maverick-free"
             ],
             "type": "string"
           },
