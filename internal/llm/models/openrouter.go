@@ -16,7 +16,7 @@ const (
 	OpenRouterO3Mini                ModelID = "openrouter.o3-mini"
 	OpenRouterO4Mini                ModelID = "openrouter.o4-mini"
 	OpenRouterGemini25Flash         ModelID = "openrouter.gemini-2.5-flash"
-	OpenRouterGemini25FlashThinking ModelID = "openrouter.gemini-2.5-flash:thinking"
+	OpenRouterGemini25FlashThinking ModelID = "openrouter.gemini-2.5-flash-thinking"
 	OpenRouterGemini25              ModelID = "openrouter.gemini-2.5"
 	OpenRouterClaude35Sonnet        ModelID = "openrouter.claude-3.5-sonnet"
 	OpenRouterClaude3Haiku          ModelID = "openrouter.claude-3-haiku"
@@ -25,11 +25,11 @@ const (
 	OpenRouterClaude3Opus           ModelID = "openrouter.claude-3-opus"
 	OpenRouterClaude4Sonnet         ModelID = "openrouter.claude-4-sonnet"
 	OpenRouterClaude4Opus           ModelID = "openrouter.claude-4-opus"
-	OpenRouterDeepSeekR1Free        ModelID = "openrouter.deepseek-r1:free"
+	OpenRouterDeepSeekR1Free        ModelID = "openrouter.deepseek-r1-free"
 	OpenRouterLlama4Scout           ModelID = "openrouter.llama-4-scout"
 	OpenRouterLlama4Maverick        ModelID = "openrouter.llama-4-maverick"
-	OpenRouterLlama4ScoutFree       ModelID = "openrouter.llama-4-scout:free"
-	OpenRouterLlama4MaverickFree    ModelID = "openrouter.llama-4-maverick:free"
+	OpenRouterLlama4ScoutFree       ModelID = "openrouter.llama-4-scout-free"
+	OpenRouterLlama4MaverickFree    ModelID = "openrouter.llama-4-maverick-free"
 )
 
 var OpenRouterModels = map[ModelID]Model{
