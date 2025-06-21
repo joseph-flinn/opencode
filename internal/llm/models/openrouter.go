@@ -25,7 +25,11 @@ const (
 	OpenRouterClaude3Opus           ModelID = "openrouter.claude-3-opus"
 	OpenRouterClaude4Sonnet         ModelID = "openrouter.claude-4-sonnet"
 	OpenRouterClaude4Opus           ModelID = "openrouter.claude-4-opus"
-	OpenRouterDeepSeekR1Free        ModelID = "openrouter.deepseek-r1-free"
+	OpenRouterDeepSeekR1Free        ModelID = "openrouter.deepseek-r1:free"
+	OpenRouterLlama4Scout           ModelID = "openrouter.llama-4-scout"
+	OpenRouterLlama4Maverick        ModelID = "openrouter.llama-4-maverick"
+	OpenRouterLlama4ScoutFree       ModelID = "openrouter.llama-4-scout:free"
+	OpenRouterLlama4MaverickFree    ModelID = "openrouter.llama-4-maverick:free"
 )
 
 var OpenRouterModels = map[ModelID]Model{
@@ -300,10 +304,9 @@ var OpenRouterModels = map[ModelID]Model{
 		ContextWindow:      AnthropicModels[Claude4Opus].ContextWindow,
 		DefaultMaxTokens:   AnthropicModels[Claude4Opus].DefaultMaxTokens,
 	},
-
 	OpenRouterDeepSeekR1Free: {
 		ID:                 OpenRouterDeepSeekR1Free,
-		Name:               "OpenRouter – DeepSeek R1 Free",
+		Name:               "OpenRouter – DeepSeek R1 (Free)",
 		Provider:           ProviderOpenRouter,
 		APIModel:           "deepseek/deepseek-r1-0528:free",
 		CostPer1MIn:        0,
@@ -313,4 +316,53 @@ var OpenRouterModels = map[ModelID]Model{
 		ContextWindow:      163_840,
 		DefaultMaxTokens:   10000,
 	},
+	OpenRouterLlama4Scout: {
+		ID:                 OpenRouterLlama4Scout,
+		Name:               "OpenRouter – Llama 4 Scout",
+		Provider:           ProviderOpenRouter,
+		APIModel:           "meta-llama/llama-4-scout:free",
+		CostPer1MIn:        0.10,
+		CostPer1MInCached:  0,
+		CostPer1MOut:       0.30,
+		CostPer1MOutCached: 0,
+		ContextWindow:      1_050_000,
+		DefaultMaxTokens:   1_050_000,
+	},
+	OpenRouterLlama4Maverick: {
+		ID:                 OpenRouterLlama4Maverick,
+		Name:               "OpenRouter – Llama 4 Maverick",
+		Provider:           ProviderOpenRouter,
+		APIModel:           "meta-llama/llama-4-maverick:free",
+		CostPer1MIn:        0.18,
+		CostPer1MInCached:  0,
+		CostPer1MOut:       0.60,
+		CostPer1MOutCached: 0,
+		ContextWindow:      1_050_000,
+		DefaultMaxTokens:   1_050_000,
+	},
+	OpenRouterLlama4ScoutFree: {
+		ID:                 OpenRouterLlama4ScoutFree,
+		Name:               "OpenRouter – Llama 4 Scout (Free)",
+		Provider:           ProviderOpenRouter,
+		APIModel:           "meta-llama/llama-4-scout",
+		CostPer1MIn:        0,
+		CostPer1MInCached:  0,
+		CostPer1MOut:       0,
+		CostPer1MOutCached: 0,
+		ContextWindow:      128_000,
+		DefaultMaxTokens:   4000,
+	},
+	OpenRouterLlama4MaverickFree: {
+		ID:                 OpenRouterLlama4MaverickFree,
+		Name:               "OpenRouter – Llama 4 Mavrick (Free)",
+		Provider:           ProviderOpenRouter,
+		APIModel:           "meta-llama/llama-4-maverick",
+		CostPer1MIn:        0,
+		CostPer1MInCached:  0,
+		CostPer1MOut:       0,
+		CostPer1MOutCached: 0,
+		ContextWindow:      128_000,
+		DefaultMaxTokens:   4000,
+	},
+
 }
