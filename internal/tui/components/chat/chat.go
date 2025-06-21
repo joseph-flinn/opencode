@@ -7,13 +7,16 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/session"
 	"github.com/opencode-ai/opencode/internal/tui/styles"
+	"github.com/opencode-ai/opencode/internal/tui/theme"
 	"github.com/opencode-ai/opencode/internal/version"
 )
 
 type SendMsg struct {
-	Text string
+	Text        string
+	Attachments []message.Attachment
 }
 
 type SessionSelectedMsg = session.Session
@@ -22,12 +25,29 @@ type SessionClearedMsg struct{}
 
 type EditorFocusMsg bool
 
+func header(width int) string {
+	return lipgloss.JoinVertical(
+		lipgloss.Top,
+		logo(width),
+		repo(width),
+		"",
+		cwd(width),
+	)
+}
+
 func lspsConfigured(width int) string {
 	cfg := config.Get()
 	title := "LSP Configuration"
 	title = ansi.Truncate(title, width, "…")
 
-	lsps := styles.BaseStyle.Width(width).Foreground(styles.PrimaryColor).Bold(true).Render(title)
+	t := theme.CurrentTheme()
+	baseStyle := styles.BaseStyle()
+
+	lsps := baseStyle.
+		Width(width).
+		Foreground(t.Primary()).
+		Bold(true).
+		Render(title)
 
 	// Get LSP names and sort them for consistent ordering
 	var lspNames []string
@@ -39,16 +59,19 @@ func lspsConfigured(width int) string {
 	var lspViews []string
 	for _, name := range lspNames {
 		lsp := cfg.LSP[name]
-		lspName := styles.BaseStyle.Foreground(styles.Forground).Render(
-			fmt.Sprintf("• %s", name),
-		)
+		lspName := baseStyle.
+			Foreground(t.Text()).
+			Render(fmt.Sprintf("• %s", name))
+
 		cmd := lsp.Command
 		cmd = ansi.Truncate(cmd, width-lipgloss.Width(lspName)-3, "…")
-		lspPath := styles.BaseStyle.Foreground(styles.ForgroundDim).Render(
-			fmt.Sprintf(" (%s)", cmd),
-		)
+
+		lspPath := baseStyle.
+			Foreground(t.TextMuted()).
+			Render(fmt.Sprintf(" (%s)", cmd))
+
 		lspViews = append(lspViews,
-			styles.BaseStyle.
+			baseStyle.
 				Width(width).
 				Render(
 					lipgloss.JoinHorizontal(
@@ -59,7 +82,8 @@ func lspsConfigured(width int) string {
 				),
 		)
 	}
-	return styles.BaseStyle.
+
+	return baseStyle.
 		Width(width).
 		Render(
 			lipgloss.JoinVertical(
@@ -75,10 +99,14 @@ func lspsConfigured(width int) string {
 
 func logo(width int) string {
 	logo := fmt.Sprintf("%s %s", styles.OpenCodeIcon, "OpenCode")
+	t := theme.CurrentTheme()
+	baseStyle := styles.BaseStyle()
 
-	version := styles.BaseStyle.Foreground(styles.ForgroundDim).Render(version.Version)
+	versionText := baseStyle.
+		Foreground(t.TextMuted()).
+		Render(version.Version)
 
-	return styles.BaseStyle.
+	return baseStyle.
 		Bold(true).
 		Width(width).
 		Render(
@@ -86,34 +114,28 @@ func logo(width int) string {
 				lipgloss.Left,
 				logo,
 				" ",
-				version,
+				versionText,
 			),
 		)
 }
 
 func repo(width int) string {
 	repo := "https://github.com/opencode-ai/opencode"
-	return styles.BaseStyle.
-		Foreground(styles.ForgroundDim).
+	t := theme.CurrentTheme()
+
+	return styles.BaseStyle().
+		Foreground(t.TextMuted()).
 		Width(width).
 		Render(repo)
 }
 
 func cwd(width int) string {
 	cwd := fmt.Sprintf("cwd: %s", config.WorkingDirectory())
-	return styles.BaseStyle.
-		Foreground(styles.ForgroundDim).
+	t := theme.CurrentTheme()
+
+	return styles.BaseStyle().
+		Foreground(t.TextMuted()).
 		Width(width).
 		Render(cwd)
 }
 
-func header(width int) string {
-	header := lipgloss.JoinVertical(
-		lipgloss.Top,
-		logo(width),
-		repo(width),
-		"",
-		cwd(width),
-	)
-	return header
-}

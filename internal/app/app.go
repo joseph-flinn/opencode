@@ -3,12 +3,15 @@ package app
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"maps"
 	"sync"
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/db"
+	"github.com/opencode-ai/opencode/internal/format"
 	"github.com/opencode-ai/opencode/internal/history"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/logging"
@@ -16,6 +19,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/session"
+	"github.com/opencode-ai/opencode/internal/tui/theme"
 )
 
 type App struct {
@@ -49,6 +53,9 @@ func New(ctx context.Context, conn *sql.DB) (*App, error) {
 		LSPClients:  make(map[string]*lsp.Client),
 	}
 
+	// Initialize theme based on configuration
+	app.initTheme()
+
 	// Initialize LSP clients in the background
 	go app.initLSPClients(ctx)
 
@@ -71,6 +78,86 @@ func New(ctx context.Context, conn *sql.DB) (*App, error) {
 	}
 
 	return app, nil
+}
+
+// initTheme sets the application theme based on the configuration
+func (app *App) initTheme() {
+	cfg := config.Get()
+	if cfg == nil || cfg.TUI.Theme == "" {
+		return // Use default theme
+	}
+
+	// Try to set the theme from config
+	err := theme.SetTheme(cfg.TUI.Theme)
+	if err != nil {
+		logging.Warn("Failed to set theme from config, using default theme", "theme", cfg.TUI.Theme, "error", err)
+	} else {
+		logging.Debug("Set theme from config", "theme", cfg.TUI.Theme)
+	}
+}
+
+// RunNonInteractive handles the execution flow when a prompt is provided via CLI flag.
+func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat string, quiet bool) error {
+	logging.Info("Running in non-interactive mode")
+
+	// Start spinner if not in quiet mode
+	var spinner *format.Spinner
+	if !quiet {
+		spinner = format.NewSpinner("Thinking...")
+		spinner.Start()
+		defer spinner.Stop()
+	}
+
+	const maxPromptLengthForTitle = 100
+	titlePrefix := "Non-interactive: "
+	var titleSuffix string
+
+	if len(prompt) > maxPromptLengthForTitle {
+		titleSuffix = prompt[:maxPromptLengthForTitle] + "..."
+	} else {
+		titleSuffix = prompt
+	}
+	title := titlePrefix + titleSuffix
+
+	sess, err := a.Sessions.Create(ctx, title)
+	if err != nil {
+		return fmt.Errorf("failed to create session for non-interactive mode: %w", err)
+	}
+	logging.Info("Created session for non-interactive run", "session_id", sess.ID)
+
+	// Automatically approve all permission requests for this non-interactive session
+	a.Permissions.AutoApproveSession(sess.ID)
+
+	done, err := a.CoderAgent.Run(ctx, sess.ID, prompt)
+	if err != nil {
+		return fmt.Errorf("failed to start agent processing stream: %w", err)
+	}
+
+	result := <-done
+	if result.Error != nil {
+		if errors.Is(result.Error, context.Canceled) || errors.Is(result.Error, agent.ErrRequestCancelled) {
+			logging.Info("Agent processing cancelled", "session_id", sess.ID)
+			return nil
+		}
+		return fmt.Errorf("agent processing failed: %w", result.Error)
+	}
+
+	// Stop spinner before printing output
+	if !quiet && spinner != nil {
+		spinner.Stop()
+	}
+
+	// Get the text content from the response
+	content := "No content available"
+	if result.Message.Content().String() != "" {
+		content = result.Message.Content().String()
+	}
+
+	fmt.Println(format.FormatOutput(content, outputFormat))
+
+	logging.Info("Non-interactive run completed", "session_id", sess.ID)
+
+	return nil
 }
 
 // Shutdown performs a clean shutdown of the application

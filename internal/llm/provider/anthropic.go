@@ -13,6 +13,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/bedrock"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/message"
@@ -66,18 +67,25 @@ func (a *anthropicClient) convertMessages(messages []message.Message) (anthropic
 		case message.User:
 			content := anthropic.NewTextBlock(msg.Content().String())
 			if cache && !a.options.disableCache {
-				content.OfRequestTextBlock.CacheControl = anthropic.CacheControlEphemeralParam{
+				content.OfText.CacheControl = anthropic.CacheControlEphemeralParam{
 					Type: "ephemeral",
 				}
 			}
-			anthropicMessages = append(anthropicMessages, anthropic.NewUserMessage(content))
+			var contentBlocks []anthropic.ContentBlockParamUnion
+			contentBlocks = append(contentBlocks, content)
+			for _, binaryContent := range msg.BinaryContent() {
+				base64Image := binaryContent.String(models.ProviderAnthropic)
+				imageBlock := anthropic.NewImageBlockBase64(binaryContent.MIMEType, base64Image)
+				contentBlocks = append(contentBlocks, imageBlock)
+			}
+			anthropicMessages = append(anthropicMessages, anthropic.NewUserMessage(contentBlocks...))
 
 		case message.Assistant:
 			blocks := []anthropic.ContentBlockParamUnion{}
 			if msg.Content().String() != "" {
 				content := anthropic.NewTextBlock(msg.Content().String())
 				if cache && !a.options.disableCache {
-					content.OfRequestTextBlock.CacheControl = anthropic.CacheControlEphemeralParam{
+					content.OfText.CacheControl = anthropic.CacheControlEphemeralParam{
 						Type: "ephemeral",
 					}
 				}
@@ -90,7 +98,7 @@ func (a *anthropicClient) convertMessages(messages []message.Message) (anthropic
 				if err != nil {
 					continue
 				}
-				blocks = append(blocks, anthropic.ContentBlockParamOfRequestToolUseBlock(toolCall.ID, inputMap, toolCall.Name))
+				blocks = append(blocks, anthropic.NewToolUseBlock(toolCall.ID, inputMap, toolCall.Name))
 			}
 
 			if len(blocks) == 0 {
@@ -159,17 +167,12 @@ func (a *anthropicClient) preparedMessages(messages []anthropic.MessageParam, to
 	temperature := anthropic.Float(0)
 	if isUser {
 		for _, m := range lastMessage.Content {
-			if m.OfRequestTextBlock != nil && m.OfRequestTextBlock.Text != "" {
-				messageContent = m.OfRequestTextBlock.Text
+			if m.OfText != nil && m.OfText.Text != "" {
+				messageContent = m.OfText.Text
 			}
 		}
 		if messageContent != "" && a.options.shouldThink != nil && a.options.shouldThink(messageContent) {
-			thinkingParam = anthropic.ThinkingConfigParamUnion{
-				OfThinkingConfigEnabled: &anthropic.ThinkingConfigEnabledParam{
-					BudgetTokens: int64(float64(a.providerOptions.maxTokens) * 0.8),
-					Type:         "enabled",
-				},
-			}
+			thinkingParam = anthropic.ThinkingConfigParamOfEnabled(int64(float64(a.providerOptions.maxTokens) * 0.8))
 			temperature = anthropic.Float(1)
 		}
 	}
@@ -196,9 +199,10 @@ func (a *anthropicClient) send(ctx context.Context, messages []message.Message, 
 	preparedMessages := a.preparedMessages(a.convertMessages(messages), a.convertTools(tools))
 	cfg := config.Get()
 	if cfg.Debug {
-		// jsonData, _ := json.Marshal(preparedMessages)
-		// logging.Debug("Prepared messages", "messages", string(jsonData))
+		jsonData, _ := json.Marshal(preparedMessages)
+		logging.Debug("Prepared messages", "messages", string(jsonData))
 	}
+
 	attempts := 0
 	for {
 		attempts++
@@ -208,6 +212,7 @@ func (a *anthropicClient) send(ctx context.Context, messages []message.Message, 
 		)
 		// If there is an error we are going to see if we can retry the call
 		if err != nil {
+			logging.Error("Error in Anthropic API call", "error", err)
 			retry, after, retryErr := a.shouldRetry(attempts, err)
 			if retryErr != nil {
 				return nil, retryErr

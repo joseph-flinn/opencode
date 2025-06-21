@@ -1,5 +1,7 @@
 # ⌬ OpenCode
 
+<p align="center"><img src="https://github.com/user-attachments/assets/9ae61ef6-70e5-4876-bc45-5bcb4e52c714" width="800"></p>
+
 > **⚠️ Early Development Notice:** This project is in early development and is not yet ready for production use. Features may change, break, or be incomplete. Use at your own risk.
 
 A powerful terminal-based AI assistant for developers, providing intelligent coding assistance directly in your terminal.
@@ -8,10 +10,15 @@ A powerful terminal-based AI assistant for developers, providing intelligent cod
 
 OpenCode is a Go-based CLI application that brings AI assistance to your terminal. It provides a TUI (Terminal User Interface) for interacting with various AI models to help with coding tasks, debugging, and more.
 
+<p>For a quick video overview, check out
+<a href="https://www.youtube.com/watch?v=P8luPmEa1QI"><img width="25" src="https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_full-color_icon_%282017%29.svg"> OpenCode + Gemini 2.5 Pro: BYE Claude Code! I'm SWITCHING To the FASTEST AI Coder!</a></p>
+
+<a href="https://www.youtube.com/watch?v=P8luPmEa1QI"><img width="550" src="https://i3.ytimg.com/vi/P8luPmEa1QI/maxresdefault.jpg"></a><p>
+
 ## Features
 
 - **Interactive TUI**: Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) for a smooth terminal experience
-- **Multiple AI Providers**: Support for OpenAI, Anthropic Claude, Google Gemini, AWS Bedrock, and Groq
+- **Multiple AI Providers**: Support for OpenAI, Anthropic Claude, Google Gemini, AWS Bedrock, Groq, Azure OpenAI, and OpenRouter
 - **Session Management**: Save and manage multiple conversation sessions
 - **Tool Integration**: AI can execute commands, search files, and modify code
 - **Vim-like Editor**: Integrated editor with text input capabilities
@@ -19,6 +26,7 @@ OpenCode is a Go-based CLI application that brings AI assistance to your termina
 - **LSP Integration**: Language Server Protocol support for code intelligence
 - **File Change Tracking**: Track and visualize file changes during sessions
 - **External Editor Support**: Open your preferred editor for composing messages
+- **Named Arguments for Custom Commands**: Create powerful custom commands with multiple named placeholders
 
 ## Installation
 
@@ -26,10 +34,10 @@ OpenCode is a Go-based CLI application that brings AI assistance to your termina
 
 ```bash
 # Install the latest version
-curl -fsSL https://opencode.ai/install | bash
+curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash
 
 # Install a specific version
-curl -fsSL https://opencode.ai/install | VERSION=0.1.0 bash
+curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | VERSION=0.1.0 bash
 ```
 
 ### Using Homebrew (macOS and Linux)
@@ -42,10 +50,10 @@ brew install opencode-ai/tap/opencode
 
 ```bash
 # Using yay
-yay -S opencode-bin
+yay -S opencode-ai-bin
 
 # Using paru
-paru -S opencode-bin
+paru -S opencode-ai-bin
 ```
 
 ### Using nix flakes
@@ -68,19 +76,60 @@ OpenCode looks for configuration in the following locations:
 - `$XDG_CONFIG_HOME/opencode/.opencode.json`
 - `./.opencode.json` (local directory)
 
+### Auto Compact Feature
+
+OpenCode includes an auto compact feature that automatically summarizes your conversation when it approaches the model's context window limit. When enabled (default setting), this feature:
+
+- Monitors token usage during your conversation
+- Automatically triggers summarization when usage reaches 95% of the model's context window
+- Creates a new session with the summary, allowing you to continue your work without losing context
+- Helps prevent "out of context" errors that can occur with long conversations
+
+You can enable or disable this feature in your configuration file:
+
+```json
+{
+  "autoCompact": true // default is true
+}
+```
+
 ### Environment Variables
 
 You can configure OpenCode using environment variables:
 
-| Environment Variable    | Purpose                  |
-| ----------------------- | ------------------------ |
-| `ANTHROPIC_API_KEY`     | For Claude models        |
-| `OPENAI_API_KEY`        | For OpenAI models        |
-| `GEMINI_API_KEY`        | For Google Gemini models |
-| `GROQ_API_KEY`          | For Groq models          |
-| `AWS_ACCESS_KEY_ID`     | For AWS Bedrock (Claude) |
-| `AWS_SECRET_ACCESS_KEY` | For AWS Bedrock (Claude) |
-| `AWS_REGION`            | For AWS Bedrock (Claude) |
+| Environment Variable       | Purpose                                                |
+| -------------------------- | ------------------------------------------------------ |
+| `ANTHROPIC_API_KEY`        | For Claude models                                      |
+| `OPENAI_API_KEY`           | For OpenAI models                                      |
+| `GEMINI_API_KEY`           | For Google Gemini models                               |
+| `VERTEXAI_PROJECT`         | For Google Cloud VertexAI (Gemini)                     |
+| `VERTEXAI_LOCATION`        | For Google Cloud VertexAI (Gemini)                     |
+| `GROQ_API_KEY`             | For Groq models                                        |
+| `AWS_ACCESS_KEY_ID`        | For AWS Bedrock (Claude)                               |
+| `AWS_SECRET_ACCESS_KEY`    | For AWS Bedrock (Claude)                               |
+| `AWS_REGION`               | For AWS Bedrock (Claude)                               |
+| `AZURE_OPENAI_ENDPOINT`    | For Azure OpenAI models                                |
+| `AZURE_OPENAI_API_KEY`     | For Azure OpenAI models (optional when using Entra ID) |
+| `AZURE_OPENAI_API_VERSION` | For Azure OpenAI models                                |
+| `LOCAL_ENDPOINT`           | For self-hosted models                                 |
+| `SHELL`                    | Default shell to use (if not specified in config)      |
+
+### Shell Configuration
+
+OpenCode allows you to configure the shell used by the bash tool. By default, it uses the shell specified in the `SHELL` environment variable, or falls back to `/bin/bash` if not set.
+
+You can override this in your configuration file:
+
+```json
+{
+  "shell": {
+    "path": "/bin/zsh",
+    "args": ["-l"]
+  }
+}
+```
+
+This is useful if you want to use a different shell than your default system shell, or if you need to pass specific arguments to the shell.
 
 ### Configuration File Structure
 
@@ -99,8 +148,12 @@ You can configure OpenCode using environment variables:
       "disabled": false
     },
     "groq": {
-        "apiKey": "your-api-key",
-        "disabled": false
+      "apiKey": "your-api-key",
+      "disabled": false
+    },
+    "openrouter": {
+      "apiKey": "your-api-key",
+      "disabled": false
     }
   },
   "agents": {
@@ -117,6 +170,10 @@ You can configure OpenCode using environment variables:
       "maxTokens": 80
     }
   },
+  "shell": {
+    "path": "/bin/bash",
+    "args": ["-l"]
+  },
   "mcpServers": {
     "example": {
       "type": "stdio",
@@ -132,7 +189,8 @@ You can configure OpenCode using environment variables:
     }
   },
   "debug": false,
-  "debugLSP": false
+  "debugLSP": false,
+  "autoCompact": true
 }
 ```
 
@@ -151,6 +209,8 @@ OpenCode supports a variety of AI models from different providers:
 
 ### Anthropic
 
+- Claude 4 Sonnet
+- Claude 4 Opus
 - Claude 3.5 Sonnet
 - Claude 3.5 Haiku
 - Claude 3.7 Sonnet
@@ -170,11 +230,25 @@ OpenCode supports a variety of AI models from different providers:
 
 ### Groq
 
-- Llama 4 Maverick (17b-128e-instruct) 
+- Llama 4 Maverick (17b-128e-instruct)
 - Llama 4 Scout (17b-16e-instruct)
 - QWEN QWQ-32b
 - Deepseek R1 distill Llama 70b
 - Llama 3.3 70b Versatile
+
+### Azure OpenAI
+
+- GPT-4.1 family (gpt-4.1, gpt-4.1-mini, gpt-4.1-nano)
+- GPT-4.5 Preview
+- GPT-4o family (gpt-4o, gpt-4o-mini)
+- O1 family (o1, o1-mini)
+- O3 family (o3, o3-mini)
+- O4 Mini
+
+### Google Cloud VertexAI
+
+- Gemini 2.5
+- Gemini 2.5 Flash
 
 ## Usage
 
@@ -189,13 +263,46 @@ opencode -d
 opencode -c /path/to/project
 ```
 
+## Non-interactive Prompt Mode
+
+You can run OpenCode in non-interactive mode by passing a prompt directly as a command-line argument. This is useful for scripting, automation, or when you want a quick answer without launching the full TUI.
+
+```bash
+# Run a single prompt and print the AI's response to the terminal
+opencode -p "Explain the use of context in Go"
+
+# Get response in JSON format
+opencode -p "Explain the use of context in Go" -f json
+
+# Run without showing the spinner (useful for scripts)
+opencode -p "Explain the use of context in Go" -q
+```
+
+In this mode, OpenCode will process your prompt, print the result to standard output, and then exit. All permissions are auto-approved for the session.
+
+By default, a spinner animation is displayed while the model is processing your query. You can disable this spinner with the `-q` or `--quiet` flag, which is particularly useful when running OpenCode from scripts or automated workflows.
+
+### Output Formats
+
+OpenCode supports the following output formats in non-interactive mode:
+
+| Format | Description                     |
+| ------ | ------------------------------- |
+| `text` | Plain text output (default)     |
+| `json` | Output wrapped in a JSON object |
+
+The output format is implemented as a strongly-typed `OutputFormat` in the codebase, ensuring type safety and validation when processing outputs.
+
 ## Command-line Flags
 
-| Flag      | Short | Description                   |
-| --------- | ----- | ----------------------------- |
-| `--help`  | `-h`  | Display help information      |
-| `--debug` | `-d`  | Enable debug mode             |
-| `--cwd`   | `-c`  | Set current working directory |
+| Flag              | Short | Description                                         |
+| ----------------- | ----- | --------------------------------------------------- |
+| `--help`          | `-h`  | Display help information                            |
+| `--debug`         | `-d`  | Enable debug mode                                   |
+| `--cwd`           | `-c`  | Set current working directory                       |
+| `--prompt`        | `-p`  | Run a single prompt in non-interactive mode         |
+| `--output-format` | `-f`  | Output format for non-interactive mode (text, json) |
+| `--quiet`         | `-q`  | Hide spinner in non-interactive mode                |
 
 ## Keyboard Shortcuts
 
@@ -209,6 +316,7 @@ opencode -c /path/to/project
 | `Ctrl+L` | View logs                                               |
 | `Ctrl+A` | Switch session                                          |
 | `Ctrl+K` | Command dialog                                          |
+| `Ctrl+O` | Toggle model selection dialog                           |
 | `Esc`    | Close current overlay/dialog or return to previous mode |
 
 ### Chat Page Shortcuts
@@ -237,6 +345,16 @@ opencode -c /path/to/project
 | `↓` or `j` | Next session     |
 | `Enter`    | Select session   |
 | `Esc`      | Close dialog     |
+
+### Model Dialog Shortcuts
+
+| Shortcut   | Action            |
+| ---------- | ----------------- |
+| `↑` or `k` | Move up           |
+| `↓` or `j` | Move down         |
+| `←` or `h` | Previous provider |
+| `→` or `l` | Next provider     |
+| `Esc`      | Close dialog      |
 
 ### Permission Dialog Shortcuts
 
@@ -295,6 +413,92 @@ OpenCode is built with a modular architecture:
 - **internal/message**: Message handling
 - **internal/session**: Session management
 - **internal/lsp**: Language Server Protocol integration
+
+## Custom Commands
+
+OpenCode supports custom commands that can be created by users to quickly send predefined prompts to the AI assistant.
+
+### Creating Custom Commands
+
+Custom commands are predefined prompts stored as Markdown files in one of three locations:
+
+1. **User Commands** (prefixed with `user:`):
+
+   ```
+   $XDG_CONFIG_HOME/opencode/commands/
+   ```
+
+   (typically `~/.config/opencode/commands/` on Linux/macOS)
+
+   or
+
+   ```
+   $HOME/.opencode/commands/
+   ```
+
+2. **Project Commands** (prefixed with `project:`):
+
+   ```
+   <PROJECT DIR>/.opencode/commands/
+   ```
+
+Each `.md` file in these directories becomes a custom command. The file name (without extension) becomes the command ID.
+
+For example, creating a file at `~/.config/opencode/commands/prime-context.md` with content:
+
+```markdown
+RUN git ls-files
+READ README.md
+```
+
+This creates a command called `user:prime-context`.
+
+### Command Arguments
+
+OpenCode supports named arguments in custom commands using placeholders in the format `$NAME` (where NAME consists of uppercase letters, numbers, and underscores, and must start with a letter).
+
+For example:
+
+```markdown
+# Fetch Context for Issue $ISSUE_NUMBER
+
+RUN gh issue view $ISSUE_NUMBER --json title,body,comments
+RUN git grep --author="$AUTHOR_NAME" -n .
+RUN grep -R "$SEARCH_PATTERN" $DIRECTORY
+```
+
+When you run a command with arguments, OpenCode will prompt you to enter values for each unique placeholder. Named arguments provide several benefits:
+
+- Clear identification of what each argument represents
+- Ability to use the same argument multiple times
+- Better organization for commands with multiple inputs
+
+### Organizing Commands
+
+You can organize commands in subdirectories:
+
+```
+~/.config/opencode/commands/git/commit.md
+```
+
+This creates a command with ID `user:git:commit`.
+
+### Using Custom Commands
+
+1. Press `Ctrl+K` to open the command dialog
+2. Select your custom command (prefixed with either `user:` or `project:`)
+3. Press Enter to execute the command
+
+The content of the command file will be sent as a message to the AI assistant.
+
+### Built-in Commands
+
+OpenCode includes several built-in commands:
+
+| Command            | Description                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------- |
+| Initialize Project | Creates or updates the OpenCode.md memory file with project-specific information                    |
+| Compact Session    | Manually triggers the summarization of the current session, creating a new session with the summary |
 
 ## MCP (Model Context Protocol)
 
@@ -375,6 +579,35 @@ The AI assistant can access LSP features through the `diagnostics` tool, allowin
 - Suggest fixes based on diagnostics
 
 While the LSP client implementation supports the full LSP protocol (including completions, hover, definition, etc.), currently only diagnostics are exposed to the AI assistant.
+
+## Using a self-hosted model provider
+
+OpenCode can also load and use models from a self-hosted (OpenAI-like) provider.
+This is useful for developers who want to experiment with custom models.
+
+### Configuring a self-hosted provider
+
+You can use a self-hosted model by setting the `LOCAL_ENDPOINT` environment variable.
+This will cause OpenCode to load and use the models from the specified endpoint.
+
+```bash
+LOCAL_ENDPOINT=http://localhost:1235/v1
+```
+
+### Configuring a self-hosted model
+
+You can also configure a self-hosted model in the configuration file under the `agents` section:
+
+```json
+{
+  "agents": {
+    "coder": {
+      "model": "local.granite-3.3-2b-instruct@q8_0",
+      "reasoningEffort": "high"
+    }
+  }
+}
+```
 
 ## Development
 

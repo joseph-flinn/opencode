@@ -12,6 +12,7 @@ import (
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/shared"
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/message"
@@ -21,6 +22,7 @@ type openaiOptions struct {
 	baseURL         string
 	disableCache    bool
 	reasoningEffort string
+	extraHeaders    map[string]string
 }
 
 type OpenAIOption func(*openaiOptions)
@@ -49,6 +51,12 @@ func newOpenAIClient(opts providerClientOptions) OpenAIClient {
 		openaiClientOptions = append(openaiClientOptions, option.WithBaseURL(openaiOpts.baseURL))
 	}
 
+	if openaiOpts.extraHeaders != nil {
+		for key, value := range openaiOpts.extraHeaders {
+			openaiClientOptions = append(openaiClientOptions, option.WithHeader(key, value))
+		}
+	}
+
 	client := openai.NewClient(openaiClientOptions...)
 	return &openaiClient{
 		providerOptions: opts,
@@ -64,7 +72,17 @@ func (o *openaiClient) convertMessages(messages []message.Message) (openaiMessag
 	for _, msg := range messages {
 		switch msg.Role {
 		case message.User:
-			openaiMessages = append(openaiMessages, openai.UserMessage(msg.Content().String()))
+			var content []openai.ChatCompletionContentPartUnionParam
+			textBlock := openai.ChatCompletionContentPartTextParam{Text: msg.Content().String()}
+			content = append(content, openai.ChatCompletionContentPartUnionParam{OfText: &textBlock})
+			for _, binaryContent := range msg.BinaryContent() {
+				imageURL := openai.ChatCompletionContentPartImageImageURLParam{URL: binaryContent.String(models.ProviderOpenAI)}
+				imageBlock := openai.ChatCompletionContentPartImageParam{ImageURL: imageURL}
+
+				content = append(content, openai.ChatCompletionContentPartUnionParam{OfImageURL: &imageBlock})
+			}
+
+			openaiMessages = append(openaiMessages, openai.UserMessage(content))
 
 		case message.Assistant:
 			assistantMsg := openai.ChatCompletionAssistantMessageParam{
@@ -204,11 +222,18 @@ func (o *openaiClient) send(ctx context.Context, messages []message.Message, too
 			content = openaiResponse.Choices[0].Message.Content
 		}
 
+		toolCalls := o.toolCalls(*openaiResponse)
+		finishReason := o.finishReason(string(openaiResponse.Choices[0].FinishReason))
+
+		if len(toolCalls) > 0 {
+			finishReason = message.FinishReasonToolUse
+		}
+
 		return &ProviderResponse{
 			Content:      content,
-			ToolCalls:    o.toolCalls(*openaiResponse),
+			ToolCalls:    toolCalls,
 			Usage:        o.usage(*openaiResponse),
-			FinishReason: o.finishReason(string(openaiResponse.Choices[0].FinishReason)),
+			FinishReason: finishReason,
 		}, nil
 	}
 }
@@ -244,15 +269,6 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 				chunk := openaiStream.Current()
 				acc.AddChunk(chunk)
 
-				if tool, ok := acc.JustFinishedToolCall(); ok {
-					toolCalls = append(toolCalls, message.ToolCall{
-						ID:    tool.Id,
-						Name:  tool.Name,
-						Input: tool.Arguments,
-						Type:  "function",
-					})
-				}
-
 				for _, choice := range chunk.Choices {
 					if choice.Delta.Content != "" {
 						eventChan <- ProviderEvent{
@@ -267,13 +283,21 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 			err := openaiStream.Err()
 			if err == nil || errors.Is(err, io.EOF) {
 				// Stream completed successfully
+				finishReason := o.finishReason(string(acc.ChatCompletion.Choices[0].FinishReason))
+				if len(acc.ChatCompletion.Choices[0].Message.ToolCalls) > 0 {
+					toolCalls = append(toolCalls, o.toolCalls(acc.ChatCompletion)...)
+				}
+				if len(toolCalls) > 0 {
+					finishReason = message.FinishReasonToolUse
+				}
+
 				eventChan <- ProviderEvent{
 					Type: EventComplete,
 					Response: &ProviderResponse{
 						Content:      currentContent,
 						ToolCalls:    toolCalls,
 						Usage:        o.usage(acc.ChatCompletion),
-						FinishReason: o.finishReason(string(acc.ChatCompletion.Choices[0].FinishReason)),
+						FinishReason: finishReason,
 					},
 				}
 				close(eventChan)
@@ -372,6 +396,12 @@ func (o *openaiClient) usage(completion openai.ChatCompletion) TokenUsage {
 func WithOpenAIBaseURL(baseURL string) OpenAIOption {
 	return func(options *openaiOptions) {
 		options.baseURL = baseURL
+	}
+}
+
+func WithOpenAIExtraHeaders(headers map[string]string) OpenAIOption {
+	return func(options *openaiOptions) {
+		options.extraHeaders = headers
 	}
 }
 

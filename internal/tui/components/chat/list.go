@@ -14,7 +14,9 @@ import (
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/opencode-ai/opencode/internal/session"
+	"github.com/opencode-ai/opencode/internal/tui/components/dialog"
 	"github.com/opencode-ai/opencode/internal/tui/styles"
+	"github.com/opencode-ai/opencode/internal/tui/theme"
 	"github.com/opencode-ai/opencode/internal/tui/util"
 )
 
@@ -33,6 +35,7 @@ type messagesCmp struct {
 	cachedContent map[string]cacheItem
 	spinner       spinner.Model
 	rendering     bool
+	attachments   viewport.Model
 }
 type renderFinishedMsg struct{}
 
@@ -69,7 +72,9 @@ func (m *messagesCmp) Init() tea.Cmd {
 func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
-
+	case dialog.ThemeChangedMsg:
+		m.rerender()
+		return m, nil
 	case SessionSelectedMsg:
 		if msg.ID != m.session.ID {
 			cmd := m.SetSession(msg)
@@ -94,6 +99,14 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case renderFinishedMsg:
 		m.rendering = false
 		m.viewport.GotoBottom()
+	case pubsub.Event[session.Session]:
+		if msg.Type == pubsub.UpdatedEvent && msg.Payload.ID == m.session.ID {
+			m.session = msg.Payload
+			if m.session.SummaryMessageID == m.currentMsgID {
+				delete(m.cachedContent, m.currentMsgID)
+				m.renderView()
+			}
+		}
 	case pubsub.Event[message.Message]:
 		needsRerender := false
 		if msg.Type == pubsub.CreatedEvent {
@@ -174,6 +187,7 @@ func formatTimeDifference(unixTime1, unixTime2 int64) string {
 func (m *messagesCmp) renderView() {
 	m.uiMessages = make([]uiMessage, 0)
 	pos := 0
+	baseStyle := styles.BaseStyle()
 
 	if m.width == 0 {
 		return
@@ -202,12 +216,15 @@ func (m *messagesCmp) renderView() {
 				m.uiMessages = append(m.uiMessages, cache.content...)
 				continue
 			}
+			isSummary := m.session.SummaryMessageID == msg.ID
+
 			assistantMessages := renderAssistantMessage(
 				msg,
 				inx,
 				m.messages,
 				m.app.Messages,
 				m.currentMsgID,
+				isSummary,
 				m.width,
 				pos,
 			)
@@ -224,16 +241,17 @@ func (m *messagesCmp) renderView() {
 
 	messages := make([]string, 0)
 	for _, v := range m.uiMessages {
-		messages = append(messages, v.content,
-			styles.BaseStyle.
+		messages = append(messages, lipgloss.JoinVertical(lipgloss.Left, v.content),
+			baseStyle.
 				Width(m.width).
 				Render(
 					"",
 				),
 		)
 	}
+
 	m.viewport.SetContent(
-		styles.BaseStyle.
+		baseStyle.
 			Width(m.width).
 			Render(
 				lipgloss.JoinVertical(
@@ -245,8 +263,10 @@ func (m *messagesCmp) renderView() {
 }
 
 func (m *messagesCmp) View() string {
+	baseStyle := styles.BaseStyle()
+
 	if m.rendering {
-		return styles.BaseStyle.
+		return baseStyle.
 			Width(m.width).
 			Render(
 				lipgloss.JoinVertical(
@@ -258,14 +278,14 @@ func (m *messagesCmp) View() string {
 			)
 	}
 	if len(m.messages) == 0 {
-		content := styles.BaseStyle.
+		content := baseStyle.
 			Width(m.width).
 			Height(m.height - 1).
 			Render(
 				m.initialScreen(),
 			)
 
-		return styles.BaseStyle.
+		return baseStyle.
 			Width(m.width).
 			Render(
 				lipgloss.JoinVertical(
@@ -277,7 +297,7 @@ func (m *messagesCmp) View() string {
 			)
 	}
 
-	return styles.BaseStyle.
+	return baseStyle.
 		Width(m.width).
 		Render(
 			lipgloss.JoinVertical(
@@ -328,6 +348,9 @@ func hasUnfinishedToolCalls(messages []message.Message) bool {
 func (m *messagesCmp) working() string {
 	text := ""
 	if m.IsAgentWorking() && len(m.messages) > 0 {
+		t := theme.CurrentTheme()
+		baseStyle := styles.BaseStyle()
+
 		task := "Thinking..."
 		lastMessage := m.messages[len(m.messages)-1]
 		if hasToolsWithoutResponse(m.messages) {
@@ -338,42 +361,49 @@ func (m *messagesCmp) working() string {
 			task = "Generating..."
 		}
 		if task != "" {
-			text += styles.BaseStyle.Width(m.width).Foreground(styles.PrimaryColor).Bold(true).Render(
-				fmt.Sprintf("%s %s ", m.spinner.View(), task),
-			)
+			text += baseStyle.
+				Width(m.width).
+				Foreground(t.Primary()).
+				Bold(true).
+				Render(fmt.Sprintf("%s %s ", m.spinner.View(), task))
 		}
 	}
 	return text
 }
 
 func (m *messagesCmp) help() string {
+	t := theme.CurrentTheme()
+	baseStyle := styles.BaseStyle()
+
 	text := ""
 
 	if m.app.CoderAgent.IsBusy() {
 		text += lipgloss.JoinHorizontal(
 			lipgloss.Left,
-			styles.BaseStyle.Foreground(styles.ForgroundDim).Bold(true).Render("press "),
-			styles.BaseStyle.Foreground(styles.Forground).Bold(true).Render("esc"),
-			styles.BaseStyle.Foreground(styles.ForgroundDim).Bold(true).Render(" to exit cancel"),
+			baseStyle.Foreground(t.TextMuted()).Bold(true).Render("press "),
+			baseStyle.Foreground(t.Text()).Bold(true).Render("esc"),
+			baseStyle.Foreground(t.TextMuted()).Bold(true).Render(" to exit cancel"),
 		)
 	} else {
 		text += lipgloss.JoinHorizontal(
 			lipgloss.Left,
-			styles.BaseStyle.Foreground(styles.ForgroundDim).Bold(true).Render("press "),
-			styles.BaseStyle.Foreground(styles.Forground).Bold(true).Render("enter"),
-			styles.BaseStyle.Foreground(styles.ForgroundDim).Bold(true).Render(" to send the message,"),
-			styles.BaseStyle.Foreground(styles.ForgroundDim).Bold(true).Render(" write"),
-			styles.BaseStyle.Foreground(styles.Forground).Bold(true).Render(" \\"),
-			styles.BaseStyle.Foreground(styles.ForgroundDim).Bold(true).Render(" and enter to add a new line"),
+			baseStyle.Foreground(t.TextMuted()).Bold(true).Render("press "),
+			baseStyle.Foreground(t.Text()).Bold(true).Render("enter"),
+			baseStyle.Foreground(t.TextMuted()).Bold(true).Render(" to send the message,"),
+			baseStyle.Foreground(t.TextMuted()).Bold(true).Render(" write"),
+			baseStyle.Foreground(t.Text()).Bold(true).Render(" \\"),
+			baseStyle.Foreground(t.TextMuted()).Bold(true).Render(" and enter to add a new line"),
 		)
 	}
-	return styles.BaseStyle.
+	return baseStyle.
 		Width(m.width).
 		Render(text)
 }
 
 func (m *messagesCmp) initialScreen() string {
-	return styles.BaseStyle.Width(m.width).Render(
+	baseStyle := styles.BaseStyle()
+
+	return baseStyle.Width(m.width).Render(
 		lipgloss.JoinVertical(
 			lipgloss.Top,
 			header(m.width),
@@ -381,6 +411,13 @@ func (m *messagesCmp) initialScreen() string {
 			lspsConfigured(m.width),
 		),
 	)
+}
+
+func (m *messagesCmp) rerender() {
+	for _, msg := range m.messages {
+		delete(m.cachedContent, msg.ID)
+	}
+	m.renderView()
 }
 
 func (m *messagesCmp) SetSize(width, height int) tea.Cmd {
@@ -391,11 +428,9 @@ func (m *messagesCmp) SetSize(width, height int) tea.Cmd {
 	m.height = height
 	m.viewport.Width = width
 	m.viewport.Height = height - 2
-	for _, msg := range m.messages {
-		delete(m.cachedContent, msg.ID)
-	}
-	m.uiMessages = make([]uiMessage, 0)
-	m.renderView()
+	m.attachments.Width = width + 40
+	m.attachments.Height = 3
+	m.rerender()
 	return nil
 }
 
@@ -413,7 +448,9 @@ func (m *messagesCmp) SetSession(session session.Session) tea.Cmd {
 		return util.ReportError(err)
 	}
 	m.messages = messages
-	m.currentMsgID = m.messages[len(m.messages)-1].ID
+	if len(m.messages) > 0 {
+		m.currentMsgID = m.messages[len(m.messages)-1].ID
+	}
 	delete(m.cachedContent, m.currentMsgID)
 	m.rendering = true
 	return func() tea.Msg {
@@ -435,6 +472,7 @@ func NewMessagesCmp(app *app.App) tea.Model {
 	s := spinner.New()
 	s.Spinner = spinner.Pulse
 	vp := viewport.New(0, 0)
+	attachmets := viewport.New(0, 0)
 	vp.KeyMap.PageUp = messageKeys.PageUp
 	vp.KeyMap.PageDown = messageKeys.PageDown
 	vp.KeyMap.HalfPageUp = messageKeys.HalfPageUp
@@ -444,5 +482,6 @@ func NewMessagesCmp(app *app.App) tea.Model {
 		cachedContent: make(map[string]cacheItem),
 		viewport:      vp,
 		spinner:       s,
+		attachments:   attachmets,
 	}
 }
